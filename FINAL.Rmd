@@ -1,0 +1,129 @@
+---
+title: "Espectrofotómetro"
+author: "Raymundo Carrasco R."
+date: "8 de mayo de 2019"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(latex2exp)
+```
+
+# Análisis espectrofotómetro
+
+Preparación de datos para análisis
+```{r message=FALSE, warning=FALSE}
+library(readr)
+datos<-data.frame(
+  read_csv("A:/Ray/OneDrive/Compartidos/Laboratorio I/7 Espectrofotómetro/Datos/Unificado.CSV")
+);
+x<-datos$Wavelength.ZnSe.; X = x*1e-9
+y<-datos$Reading.ZnSe.; Y = y/100
+```
+
+## Gráfico de conjunto de datos experimentales
+
+```{r, echo =FALSE}
+plot(x,y, main ="ZnSe",xlab = "Longitud de onda (nm)",ylab = "Transmitancia (%)",type = 'l')
+```
+
+## $Mínimos, máximos, n, d$ y $\frac{1}{\lambda^2}$
+
+```{r}
+minx=c(605.06, 649.86, 703.19, 771.03, 853.38, 957.49); minX = minx*1e-9
+miny=c(46.014, 47.014, 47.283, 47.858, 48.443, 49.414); minY = miny/100
+M = 2*1.5/minY-(1.5^2+1)/2
+nmin = sqrt(M+sqrt(M^2-1.5^2))
+ilc=1/minX^2;#inverso de Lambda cuadrada
+D = c()
+for (i in 1:length(minX)-1) {
+  D[i] = minX[i]*minX[i+1]/(2*(nmin[i]*minX[i+1]-nmin[i+1]*minX[i]))
+}
+d = mean(D); d
+```
+El valor promedio del espesor es entonces de 1.228 $\mu m$
+
+## Ajuste lineal para n
+
+```{r}
+plot(ilc,nmin, main = "Ãndice n", xlab = TeX('$1/\\lambda^2$ $(\\times 10^{12})$'), ylab = "n", col="red")
+
+ajuste<-lm(nmin ~ ilc) #lm(dependiente ~ parÃ¡metro)
+summary(ajuste)
+
+abline(ajuste, col="blue")
+```
+
+Concluyendo así que $n(\lambda)=2.856+\frac{8.498\times10^{24}}{\lambda^2}$
+
+## Determinación del coeficiente de atenuación $\alpha$
+
+```{r}
+alpha=c()
+nf<-function(x) ajuste$coefficients[1]+ajuste$coefficients[2]/x^2
+for (i in 1:length(X)) {
+  alpha[i]=(-1/d)*log(((nf(X[i])+1)^3)*(nf(X[i])+(1.5)^2)*Y[i]/(16*(nf(X[i])^2)*1.5))
+}
+plot(x,alpha*1e-2, main = TeX("$\\alpha$ $VS$ $\\lambda$") ,type = 'l', xlab = TeX("$\\lambda (nm)$"), ylab = TeX("$\\alpha (cm^-1)$"))
+```
+
+## Gráficos
+### $n$ $VS$ $\lambda$
+
+```{r}
+plot(x,nf(X), main=TeX("$n$ $VS$ $\\lambda$"), ylab = TeX("$n$"), xlab = TeX("$\\lambda$"), type = 'l')
+```
+
+### $\alpha$ $VS$ $\lambda$ En el canto de absorción (400-600 nm)
+
+```{r}
+canto = c(); index = c(); alphacanto=c(); rango = c(440,540.5)
+for (i in 1:length(x)) {
+  if(x[i]>rango[1] && x[i]<rango[2]){
+    canto = c(x[i],canto); index = c(i,index);alphacanto =c(alpha[i],alphacanto)
+  }
+}
+plot(canto,alphacanto*1e-2, main = TeX("$\\alpha$ $VS$ $\\lambda$"),
+     type = 'l',ylab = TeX("$\\alpha (cm-{-1})$"), 
+     xlab = TeX("$\\lambda (nm)$"),
+     col = "blue")
+
+```
+
+Se observa un comportamiento lineal en el intervalo de 480 a 530 nm
+
+### $\alpha h \nu$ $VS$ $h\nu$
+
+```{r}
+hce = 1239.841875
+hnu = hce/canto
+alhnu = (alphacanto*1e-2)*(hce/canto)
+plot(hnu,alhnu,type = 'l', ylab = TeX("$\\alpha h \\nu $"), xlab = TeX("$h \\nu$"),
+     col = "blue")
+```
+
+### Cálculo de la brecha de energía $E_g$
+
+```{r}
+plot(hnu,alhnu^2,type = 'l',ylab = TeX("$(\\alpha h \\nu )^2$"), xlab = TeX("$h \\nu$"),
+     col = "blue")
+rango =c(485,510.5)
+index=c()
+a=b=c()
+for (i in 1:length(canto)) {
+  if (canto[i]>=rango[1] && canto[i]<rango[2]) {
+    index = c(i,index); a = c(alhnu[i]^2,a); b = c(hnu[i],b)
+  }
+}
+ajuste2<-lm(a~b)
+summary(ajuste2)
+abline(ajuste2, col = "red")
+brecha = -ajuste2$coefficients[1]/ajuste2$coefficients[2]
+print(brecha)
+```
+
+
